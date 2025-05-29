@@ -1,15 +1,36 @@
 import express from "express";
+import session from "express-session";
+import cookieParser from "cookie-parser";
 
 const host = "0.0.0.0";
 const port = 3000;
 var listaUsuarios = [];
-
 const app = express();
 
 //processar o formulário
 app.use(express.urlencoded({ extended: true }));
 
-app.get("/", (requisicao, resposta) => {
+//Preparando a aplicação para fazer uso de sessão
+//adicionando à aplicação o middleware session
+
+app.use(session({
+    secret: "M1nh4Ch4v3S3cr3t4",
+    resave: false,
+    saveUninitialized: false,
+    cookie: { //definir o tempo de vida útil de uma sessão
+        maxAge: 1000 * 60 * 15, //depois de 15 minutos de inatividade do usuário a sessão será excluida
+        httpOnly: true,
+        secure: false //true se for https
+    }
+}));
+
+//Adicionando o middleware cookieParser na nossa aplicação
+//para permitir que nossa aplicação consiga ler e escreve cookies no navegador de um usuário
+app.use(cookieParser());
+
+
+app.get("/", verificarAutenticacao, (requisicao, resposta) => {
+    const ultimoLogin = requisicao.cookies.ultimoLogin;
     resposta.send(`
             <html lang="pt-br">
                 <head>
@@ -44,6 +65,7 @@ app.get("/", (requisicao, resposta) => {
                                     <a class="nav-link" href="/logout">Sair</a>
                                 </li>
                             </ul>
+                            <span class="navbar-text">${ultimoLogin?"Ultimo login: " + ultimoLogin:""}</span>
                         </div>
                     </div>
                     </nav>
@@ -54,67 +76,67 @@ app.get("/", (requisicao, resposta) => {
     resposta.end();
 });
 
-app.get("/cadastroUsuario", (requisicao, resposta) => {
-
-    resposta.send(`
-        <html lang="pt-br">
-                <head>
-                    <meta charset="UTF-8">
-                    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.6/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-4Q6Gf2aSP4eDXB8Miphtr37CMZZQ5oXLH2yaXMJ2w8e2ZtHTl7GptT4jmndRuHDT" crossorigin="anonymous">
-                    <title>Página inicial do aplicativo</title>
-                </head>
-                <body>
-                    <div class="container w-75 mb-5 mt-5">
-                        <form method="POST" action="/cadastroUsuario" class="row g-3 border p-2" novalidate>
-                            <fieldset>
-                                <legend class="text-center">Cadastro de Usuários</legend>
-                            </fieldset>
-                            <div class="col-md-4">
-                                <label for="nome" class="form-label">Primeiro nome</label>
-                                <input type="text" class="form-control" id="nome" name="nome" required>
-                            </div>
-                            <div class="col-md-4">
-                                <label for="sobronome" class="form-label">Sobrenome</label>
-                                <input type="text" class="form-control" id="sobronome" name="sobronome" required>
-                            </div>
-                            <div class="col-md-4">
-                                <label for="nomeUsuario" class="form-label">Nome do usuário:</label>
-                                <div class="input-group has-validation">
-                                    <span class="input-group-text" id="inputGroupPrepend">@</span>
-                                    <input type="text" class="form-control" id="nomeUsuario" name="nomeUsuario" aria-describedby="inputGroupPrepend" required>
+app.get("/cadastroUsuario", verificarAutenticacao, (requisicao, resposta) => {
+    
+        resposta.send(`
+            <html lang="pt-br">
+                    <head>
+                        <meta charset="UTF-8">
+                        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.6/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-4Q6Gf2aSP4eDXB8Miphtr37CMZZQ5oXLH2yaXMJ2w8e2ZtHTl7GptT4jmndRuHDT" crossorigin="anonymous">
+                        <title>Página inicial do aplicativo</title>
+                    </head>
+                    <body>
+                        <div class="container w-75 mb-5 mt-5">
+                            <form method="POST" action="/cadastroUsuario" class="row g-3 border p-2" novalidate>
+                                <fieldset>
+                                    <legend class="text-center">Cadastro de Usuários</legend>
+                                </fieldset>
+                                <div class="col-md-4">
+                                    <label for="nome" class="form-label">Primeiro nome</label>
+                                    <input type="text" class="form-control" id="nome" name="nome" required>
                                 </div>
-                            </div>
-                            <div class="col-md-6">
-                                <label for="cidade" class="form-label">Cidade</label>
-                                <input type="text" class="form-control" id="cidade" name="cidade" required>
-                            </div>
-                            <div class="col-md-3">
-                                <label for="uf" class="form-label">UF</label>
-                                <select class="form-select" id="uf" name="uf" required>
-                                    <option selected disabled value="">Escolha um estado...</option>
-                                    <option>SP</option>
-                                    <option>RJ</option>
-                                    <option>PR</option>
-                                </select>
-                            </div>
-                            <div class="col-md-3">
-                                <label for="cep" class="form-label">CEP</label>
-                                <input type="text" class="form-control" id="cep" name="cep" required>
-                            </div>
-                            <div class="col-12">
-                                <button class="btn btn-primary" type="submit">Cadastrar</button>
-                                <a class="btn btn-secondary" href="/">Voltar</a>
-                            </div>
-                        </form>
-                    </div>
-                </body>
-                <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.6/dist/js/bootstrap.bundle.min.js" integrity="sha384-j1CDi7MgGQ12Z7Qab0qlWQ/Qqz24Gc6BM0thvEMVjHnfYGF0rmFCozFSxQBxwHKO" crossorigin="anonymous"></script>
-            </html>
-    `);
-    resposta.end();
+                                <div class="col-md-4">
+                                    <label for="sobronome" class="form-label">Sobrenome</label>
+                                    <input type="text" class="form-control" id="sobronome" name="sobronome" required>
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="nomeUsuario" class="form-label">Nome do usuário:</label>
+                                    <div class="input-group has-validation">
+                                        <span class="input-group-text" id="inputGroupPrepend">@</span>
+                                        <input type="text" class="form-control" id="nomeUsuario" name="nomeUsuario" aria-describedby="inputGroupPrepend" required>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="cidade" class="form-label">Cidade</label>
+                                    <input type="text" class="form-control" id="cidade" name="cidade" required>
+                                </div>
+                                <div class="col-md-3">
+                                    <label for="uf" class="form-label">UF</label>
+                                    <select class="form-select" id="uf" name="uf" required>
+                                        <option selected disabled value="">Escolha um estado...</option>
+                                        <option>SP</option>
+                                        <option>RJ</option>
+                                        <option>PR</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <label for="cep" class="form-label">CEP</label>
+                                    <input type="text" class="form-control" id="cep" name="cep" required>
+                                </div>
+                                <div class="col-12">
+                                    <button class="btn btn-primary" type="submit">Cadastrar</button>
+                                    <a class="btn btn-secondary" href="/">Voltar</a>
+                                </div>
+                            </form>
+                        </div>
+                    </body>
+                    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.6/dist/js/bootstrap.bundle.min.js" integrity="sha384-j1CDi7MgGQ12Z7Qab0qlWQ/Qqz24Gc6BM0thvEMVjHnfYGF0rmFCozFSxQBxwHKO" crossorigin="anonymous"></script>
+                </html>
+        `);
+        resposta.end();
 });
 
-app.post("/cadastroUsuario", (requisicao, resposta) => {
+app.post("/cadastroUsuario", verificarAutenticacao, (requisicao, resposta) => {
     const nome = requisicao.body.nome;
     const sobronome = requisicao.body.sobronome;
     const nomeUsuario = requisicao.body.nomeUsuario;
@@ -261,7 +283,7 @@ app.post("/cadastroUsuario", (requisicao, resposta) => {
     }
 });
 
-app.get("/listaUsuarios", (requisicao, resposta) => {
+app.get("/listaUsuarios", verificarAutenticacao,(requisicao, resposta) => {
     let conteudo = `
             <html lang="pt-br">
                 <head>
@@ -343,15 +365,15 @@ app.get("/login", (requisicao, resposta) => {
                     <div id="login-row" class="row justify-content-center align-items-center">
                         <div id="login-column" class="col-md-6">
                             <div id="login-box" class="col-md-12">
-                                <form id="login-form" class="form" action="" method="post">
+                                <form id="login-form" class="form" action="/login" method="post">
                                     <h3 class="text-center text-info">Login</h3>
                                     <div class="form-group">
                                         <label for="usuario" class="text-info">Usuário:</label><br>
-                                        <input type="text" name="usuari9o" id="usuario" class="form-control">
+                                        <input type="text" name="usuario" id="usuario" class="form-control">
                                     </div>
                                     <div class="form-group">
                                         <label for="senha" class="text-info">Senha:</label><br>
-                                        <input type="text" name="senha" id="senha" class="form-control">
+                                        <input type="password" name="senha" id="senha" class="form-control">
                                     </div>
                                     <div class="form-group">
                                         <input type="submit" name="submit" class="btn btn-info btn-md" value="Entrar">
@@ -372,12 +394,89 @@ app.get("/login", (requisicao, resposta) => {
 app.post("/login", (requisicao, resposta) => {
     const usuario = requisicao.body.usuario;
     const senha = requisicao.body.senha;
+    if (usuario == "admin" && senha == "123"){
+        requisicao.session.logado = true;
+        const dataHoraAtuais = new Date();
+        resposta.cookie('ultimoLogin',dataHoraAtuais.toLocaleString(), { maxAge: 1000 * 60 * 60 * 24 * 30});
+        resposta.redirect("/");
+    }
+    else{
+         resposta.send(`
+            <html lang="pt-br">
+                <head>
+                    <meta charset="UTF-8">
+                    <link href="//maxcdn.bootstrapcdn.com/bootstrap/4.1.1/css/bootstrap.min.css" rel="stylesheet" id="bootstrap-css">
+                    <title>Login do Sistema</title>
+                    <style>
+                        body {
+                            margin: 0;
+                            padding: 0;
+                            background-color: #17a2b8;
+                            height: 100vh;
+                        }
+                        #login .container #login-row #login-column #login-box {
+                            margin-top: 120px;
+                            max-width: 600px;
+                            height: 320px;
+                            border: 1px solid #9C9C9C;
+                            background-color: #EAEAEA;
+                        }
+                        #login .container #login-row #login-column #login-box #login-form {
+                            padding: 20px;
+                        }
+                        #login .container #login-row #login-column #login-box #login-form #register-link {
+                            margin-top: -85px;
+                        }
+                    </style>
+                </head>
+                <body>
+                    <div id="login">
+                        <h3 class="text-center text-white pt-5">Acessar o Sistema</h3>
+                        <div class="container">
+                            <div id="login-row" class="row justify-content-center align-items-center">
+                                <div id="login-column" class="col-md-6">
+                                    <div id="login-box" class="col-md-12">
+                                        <form id="login-form" class="form" action="" method="post">
+                                            <h3 class="text-center text-info">Login</h3>
+                                            <div class="form-group">
+                                                <label for="usuario" class="text-info">Usuário:</label><br>
+                                                <input type="text" name="usuario" id="usuario" class="form-control">
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="senha" class="text-info">Senha:</label><br>
+                                                <input type="password" name="senha" id="senha" class="form-control">
+                                            </div>
+                                            <span style="color: red;">Usuário ou senha inválidos!</span>
+                                            <div class="form-group">
+                                                <input type="submit" name="submit" class="btn btn-info btn-md">
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </body>
+                <script src="//maxcdn.bootstrapcdn.com/bootstrap/4.1.1/js/bootstrap.min.js"></script>
+                <script src="//cdnjs.cloudflare.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+            </html>
+    `);
+    }
     //Realizar validação
-    resposta.redirect("/");
 });
 
+function verificarAutenticacao(requisicao, resposta, next) {  //next = próximo
+    if (requisicao.session.logado){
+        next();
+    }
+    else{
+        resposta.redirect("/login");
+    }
+}
+
 app.get("/logout", (requisicao, resposta) => {
-    resposta.send("<p>Você saiu do sistema.</p>");
+    requisicao.session.destroy();
+    resposta.redirect("/login");
 });
 
 app.listen(port, host, () => {
